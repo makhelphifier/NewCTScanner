@@ -13,15 +13,37 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
 set(PROJECT_SOURCES
-        main.cpp
-        mainwindow.cpp
-        mainwindow.h
+        src/main.cpp
 )
+
+set(UI_SOURCES
+        src/ui/mainwindow.cpp
+        src/ui/mainwindow.h
+)
+
+set(CORE_SOURCES
+        src/core/scancontroller.cpp
+        src/core/scancontroller.h
+)
+
+
+set(HAL_HEADERS
+        src/hal/IXRaySource.h
+        src/hal/DummySource.h
+)
+
+
+
+list(APPEND PROJECT_SOURCES ${UI_SOURCES})
+list(APPEND PROJECT_SOURCES ${CORE_SOURCES})
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        src/core/scancontroller.h src/core/scancontroller.cpp
+        src/hal/IXRaySource.h
+        src/hal/dummysource.h src/hal/dummysource.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET NewCTScanner APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -42,6 +64,14 @@ else()
 endif()
 
 target_link_libraries(NewCTScanner PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+target_include_directories(NewCTScanner PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/hal"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/common"
+)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
