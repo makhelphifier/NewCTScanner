@@ -30,13 +30,23 @@ set(CORE_SOURCES
 set(HAL_HEADERS
         src/hal/IXRaySource.h
         src/hal/DummySource.h
+        src/hal/dummysource.cpp
+
+)
+set(COMMON_FILES
+    src/common/ScanParameters.h
 )
 
 
 
 list(APPEND PROJECT_SOURCES ${UI_SOURCES})
 list(APPEND PROJECT_SOURCES ${CORE_SOURCES})
-
+list(APPEND PROJECT_SOURCES
+    ${UI_FILES}
+    ${CORE_FILES}
+    ${HAL_FILES}
+    ${COMMON_FILES}
+)
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION

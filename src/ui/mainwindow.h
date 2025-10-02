@@ -5,7 +5,8 @@
 #include <QThread>
 #include <QLabel>
 #include "core/scancontroller.h"
-
+#include <QDoubleSpinBox>
+#include <QFormLayout>
 
 // 前向声明
 class ScanController;
@@ -21,6 +22,7 @@ public:
 public slots:
     void updateStatus(const QString &status);
     void onStateChanged(ScanController::ScanState newState);
+    void updateImage(const QImage &image);
 
 private:
     // UI 持有业务逻辑层的实例
@@ -33,5 +35,13 @@ private:
 
     QThread* m_workerThread;
     QLabel* m_statusLabel;
+    QDoubleSpinBox* m_voltageSpinBox;
+    QDoubleSpinBox* m_currentSpinBox;
+    QLabel* m_imageDisplayLabel;
+
+private slots:
+    void onParametersChanged();
+signals:
+    void parametersChanged(const ScanParameters &params);
 };
 #endif // MAINWINDOW_H

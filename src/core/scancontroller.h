@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QStateMachine>
 #include <QState>
+#include "common/ScanParameters.h"
 // 前向声明
 class IXRaySource;
 
@@ -23,6 +24,8 @@ public slots:
     void requestScan();
     // UI请求停止/复位
     void requestStop();
+    void updateParameters(const ScanParameters &params);
+
 private slots:
     // 进入“准备”状态时执行
     void onPreparing();
@@ -30,12 +33,15 @@ private slots:
     void onScanning();
     // 进入“空闲”状态时执行
     void onIdle();
+    void onNewImageFromSource(const QImage &image);
+
 signals:
     void statusUpdated(const QString &status);
     void scanRequested();
     void stopRequested();
     void preparationFinished();
     void stateChanged(ScanState newState);
+    void newProjectionImage(const QImage &image);
 
 private:
     // 使用接口指针，而不是具体实现
@@ -48,6 +54,8 @@ private:
 
     // 私有方法，用于初始化状态机
     void setupStateMachine();
+    ScanParameters m_currentParams;
+
 };
 
 #endif // SCANCONTROLLER_H

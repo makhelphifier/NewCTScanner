@@ -20,6 +20,27 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(m_startXRayButton);
     m_statusLabel = new QLabel("Initializing...", this);
     m_statusLabel->setAlignment(Qt::AlignCenter); // 居中显示
+    QFormLayout *formLayout = new QFormLayout();
+    m_voltageSpinBox = new QDoubleSpinBox(this);
+    m_voltageSpinBox->setRange(20.0, 225.0);
+    m_voltageSpinBox->setValue(100.0);
+    m_voltageSpinBox->setSuffix(" kV");
+
+    m_currentSpinBox = new QDoubleSpinBox(this);
+    m_currentSpinBox->setRange(10.0, 1000.0);
+    m_currentSpinBox->setValue(50.0);
+    m_currentSpinBox->setSuffix(" uA");
+
+    formLayout->addRow("Voltage:", m_voltageSpinBox);
+    formLayout->addRow("Current:", m_currentSpinBox);
+
+    layout->addLayout(formLayout);
+    m_imageDisplayLabel = new QLabel(this);
+    m_imageDisplayLabel->setMinimumSize(256, 256);
+    m_imageDisplayLabel->setStyleSheet("background-color: black; border: 1px solid gray;");
+    m_imageDisplayLabel->setAlignment(Qt::AlignCenter);
+    m_imageDisplayLabel->setText("IMAGE DISPLAY");
+    layout->addWidget(m_imageDisplayLabel);
     layout->addWidget(m_statusLabel);
     this->setCentralWidget(centralWidget);
     this->setWindowTitle("New CT Scanner Control");
@@ -32,11 +53,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_scanController, &ScanController::statusUpdated,
             this, &MainWindow::updateStatus);
-    connect(m_scanController, &ScanController::statusUpdated,
-            this, &MainWindow::updateStatus);
+
     connect(m_scanController, &ScanController::stateChanged,
             this, &MainWindow::onStateChanged);
-    // 6. 启动线程
+    connect(m_voltageSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
+    connect(m_currentSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
+    connect(this, &MainWindow::parametersChanged,
+            m_scanController, &ScanController::updateParameters);
+    connect(m_scanController, &ScanController::newProjectionImage,
+            this, &MainWindow::updateImage, Qt::QueuedConnection);
+    onParametersChanged();
     m_workerThread->start();
 }
 
@@ -44,9 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // 停止线程
     m_workerThread->quit();
-    // 等待线程完全结束
     m_workerThread->wait();
 }
 
@@ -72,4 +96,20 @@ void MainWindow::onStateChanged(ScanController::ScanState newState)
         m_stopButton->setEnabled(true);  // 扫描中，可以停止
         break;
     }
+}
+void MainWindow::onParametersChanged()
+{
+    ScanParameters params;
+    params.voltage = m_voltageSpinBox->value();
+    params.current = m_currentSpinBox->value();
+    emit parametersChanged(params);
+}
+
+void MainWindow::updateImage(const QImage &image)
+{
+    m_imageDisplayLabel->setPixmap(QPixmap::fromImage(image).scaled(
+        m_imageDisplayLabel->size(),
+        Qt::KeepAspectRatio,
+        Qt::SmoothTransformation
+        ));
 }
