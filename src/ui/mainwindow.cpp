@@ -6,18 +6,21 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSpinBox>
-#include <QFileDialog> // 别忘了包含
+#include <QFileDialog>
+#include "core/hardwareservice.h"
 
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    m_hardwareService = new HardwareService(this);
+    m_hardwareService->init();
+
     m_workerThread = new QThread(this);
-    m_scanController = new ScanController();
+    m_scanController = new ScanController(m_hardwareService);
 
     m_scanController->moveToThread(m_workerThread);
     connect(m_workerThread, &QThread::started, m_scanController, &ScanController::init);
-
     connect(m_workerThread, &QThread::finished, m_scanController, &QObject::deleteLater);
 
     QWidget *centralWidget = new QWidget(this);
@@ -55,7 +58,6 @@ MainWindow::MainWindow(QWidget *parent)
     saveLayout->addWidget(m_browseButton);
     layout->addLayout(saveLayout);
 
-
     QHBoxLayout* configLayout = new QHBoxLayout();
     m_loadConfigButton = new QPushButton("Load Config", this);
     m_saveConfigButton = new QPushButton("Save Config", this);
@@ -71,9 +73,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_imageDisplayLabel->setText("IMAGE DISPLAY");
     layout->addWidget(m_imageDisplayLabel);
 
-
-
-    // 在主布局的某个合适位置（例如，图像显示区旁边或下面）
     QVBoxLayout* reconLayout = new QVBoxLayout();
     m_reconDisplayLabel = new QLabel(this);
     m_reconDisplayLabel->setMinimumSize(256, 256);
@@ -89,14 +88,7 @@ MainWindow::MainWindow(QWidget *parent)
     reconLayout->addWidget(m_reconDisplayLabel);
     reconLayout->addWidget(m_reconProgressBar);
 
-    // 你可能需要一个主水平布局来并列显示采集图像和重建图像
-    // 例如： QHBoxLayout* displayLayout = new QHBoxLayout();
-    // displayLayout->addWidget(m_imageDisplayLabel);
-    // displayLayout->addLayout(reconLayout);
-    // layout->addLayout(displayLayout);
-    layout->addLayout(reconLayout); // 简单起见，先垂直添加
-
-
+    layout->addLayout(reconLayout);
     m_scanProgressBar = new QProgressBar(this);
     m_scanProgressBar->setTextVisible(true);
     m_scanProgressBar->setValue(0);
@@ -109,22 +101,17 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(m_statusLabel);
     this->setCentralWidget(centralWidget);
     this->setWindowTitle("New CT Scanner Control");
-
     connect(m_startXRayButton, &QPushButton::clicked,
             m_scanController, &ScanController::requestScan);
-
     connect(m_stopButton, &QPushButton::clicked,
             m_scanController, &ScanController::requestStop);
-
     connect(m_scanController, &ScanController::statusUpdated,
             this, &MainWindow::updateStatus);
-
     connect(m_scanController, &ScanController::stateChanged,
             this, &MainWindow::onStateChanged);
     connect(m_voltageSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
     connect(m_currentSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
     connect(m_frameCountSpinBox, &QSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
-
     connect(this, &MainWindow::parametersChanged,
             m_scanController, &ScanController::updateParameters);
     connect(m_scanController, &ScanController::newProjectionImage,
@@ -134,7 +121,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_browseButton, &QPushButton::clicked, this, &MainWindow::browseForDirectory);
     connect(m_saveDirLineEdit, &QLineEdit::textChanged, this, &MainWindow::onSavePathChanged);
     connect(m_savePrefixLineEdit, &QLineEdit::textChanged, this, &MainWindow::onSavePathChanged);
-
     connect(this, &MainWindow::savePathChanged, m_scanController, &ScanController::updateSavePath);
     connect(m_scanController, &ScanController::errorOccurred,
             this, &MainWindow::displayError, Qt::QueuedConnection);
@@ -144,20 +130,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scanController, &ScanController::reconstructionStarted, this, &MainWindow::onReconstructionStarted);
     connect(m_scanController, &ScanController::reconstructionProgress, this, &MainWindow::updateReconProgress);
     connect(m_scanController, &ScanController::reconstructionFinished, this, &MainWindow::displayReconResult);
-    // 连接ScanController的配置加载信号到UI的更新槽
     connect(m_scanController, &ScanController::configurationLoaded, this, &MainWindow::applyLoadedParameters);
-
-
-    // 发送一次初始路径
     onSavePathChanged();
-
-    // 发送第一条日志
     Log("Application started. UI is ready.");
     onParametersChanged();
     m_workerThread->start();
 }
-
-
 
 MainWindow::~MainWindow()
 {
@@ -291,12 +269,10 @@ void MainWindow::onSaveConfig()
 void MainWindow::applyLoadedParameters(const ScanParameters &params)
 {
     Log("Applying loaded parameters to UI.");
-    // 更新UI上的所有控件
     m_voltageSpinBox->setValue(params.voltage);
     m_currentSpinBox->setValue(params.current);
     m_frameCountSpinBox->setValue(params.frameCount);
 
-    // 确保更新也通知到后台
     onParametersChanged();
 }
 

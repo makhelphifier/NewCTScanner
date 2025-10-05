@@ -33,7 +33,7 @@ ScanParameters ConfigManager::loadConfig(const QString &filePath)
         QString msg = "Failed to open file for reading: " + filePath;
         Log("ERROR: " + msg);
         emit error(msg);
-        return ScanParameters(); // 返回默认参数
+        return ScanParameters();
     }
 
     QByteArray data = file.readAll();

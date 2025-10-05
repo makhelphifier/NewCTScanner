@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+#include "ui/mainwindow.h"
 #include "common/ScanParameters.h"
 
 #include <QApplication>

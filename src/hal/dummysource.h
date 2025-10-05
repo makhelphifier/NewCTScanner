@@ -11,6 +11,7 @@ class DummySource :  public IXRaySource {
 public:
     explicit DummySource(QObject *parent = nullptr);
     ~DummySource();
+public slots:
 
     bool connect() override;
     void disconnect() override ;
@@ -19,7 +20,7 @@ public:
     bool turnOff() override;
 
 private slots:
-    void generateImage();
+    // void generateImage();
 
 private:
     QTimer* m_acquisitionTimer;

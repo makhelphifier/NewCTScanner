@@ -8,6 +8,7 @@ class IXRaySource: public QObject  {
 
 public:
     virtual ~IXRaySource() {}
+public slots:
 
     virtual bool connect() = 0;
     virtual void disconnect() = 0;
@@ -17,9 +18,7 @@ public:
 signals:
     void newImageReady(const QImage &image);
     void hardwareError(const QString &errorMessage);
-    // 报告扫描进度
     void acquisitionProgress(int currentFrame, int totalFrames);
-    // 报告扫描完成
     void acquisitionFinished();
 };
 

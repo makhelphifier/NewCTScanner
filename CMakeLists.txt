@@ -12,89 +12,77 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets StateMachine)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets StateMachine)
 
-set(PROJECT_SOURCES
-        src/main.cpp
+# --- Organize all project source and header files here ---
+set(UI_FILES
+    src/ui/mainwindow.h
+    src/ui/mainwindow.cpp
 )
 
-set(UI_SOURCES
-        src/ui/mainwindow.cpp
-        src/ui/mainwindow.h
+set(CORE_FILES
+    src/core/configmanager.h
+    src/core/configmanager.cpp
+    src/core/datasaver.h
+    src/core/datasaver.cpp
+    src/core/hardwareservice.h
+    src/core/hardwareservice.cpp
+    src/core/reconstructioncontroller.h
+    src/core/reconstructioncontroller.cpp
+    src/core/scancontroller.h
+    src/core/scancontroller.cpp
+    src/core/reconstructiontask.h
+    src/core/reconstructiontask.cpp
 )
 
-set(CORE_SOURCES
-        src/core/scancontroller.cpp
-        src/core/scancontroller.h
-        src/core/reconstructioncontroller.cpp
-        src/core/reconstructioncontroller.h
+set(HAL_FILES
+    src/hal/IXRaySource.h
+    src/hal/dummysource.h
+    src/hal/dummysource.cpp
+    src/hal/IDetector.h
+    src/hal/dummydetector.h
+    src/hal/dummydetector.cpp
+    src/hal/IMotionStage.h
+    src/hal/dummymotionstage.h
+    src/hal/dummymotionstage.cpp
 )
 
-
-set(HAL_HEADERS
-        src/hal/IXRaySource.h
-        src/hal/DummySource.h
-        src/hal/dummysource.cpp
-
-)
 set(COMMON_FILES
+    src/common/logger.h
+    src/common/logger.cpp
     src/common/ScanParameters.h
 )
 
-
-
-list(APPEND PROJECT_SOURCES ${UI_SOURCES})
-list(APPEND PROJECT_SOURCES ${CORE_SOURCES})
-list(APPEND PROJECT_SOURCES
+set(PROJECT_SOURCES
+    src/main.cpp
     ${UI_FILES}
     ${CORE_FILES}
     ${HAL_FILES}
     ${COMMON_FILES}
 )
+# --- End of file organization ---
+
+
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        src/core/scancontroller.h src/core/scancontroller.cpp
-        src/hal/IXRaySource.h
-        src/hal/dummysource.h src/hal/dummysource.cpp
-        src/common/logger.h src/common/logger.cpp
-        src/core/datasaver.h src/core/datasaver.cpp
-        src/core/configmanager.h src/core/configmanager.cpp
-        src/core/reconstructioncontroller.h src/core/reconstructioncontroller.cpp
+
     )
-# Define target properties for Android with Qt 6 as:
-#    set_property(TARGET NewCTScanner APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
-# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 else()
-    if(ANDROID)
-        add_library(NewCTScanner SHARED
-            ${PROJECT_SOURCES}
-        )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
-    else()
-        add_executable(NewCTScanner
-            ${PROJECT_SOURCES}
-        )
-    endif()
+    add_executable(NewCTScanner ${PROJECT_SOURCES})
 endif()
 
-target_link_libraries(NewCTScanner PRIVATE Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::StateMachine)
+target_link_libraries(NewCTScanner PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::StateMachine)
 
+# Add include directories for headers
 target_include_directories(NewCTScanner PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/hal"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/common"
 )
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
-if(${QT_VERSION} VERSION_LESS 6.1.0)
+# --- Properties for macOS and Windows deployment ---
+if(${QT_VERSION} VERSION_LESS 6.1.0 AND APPLE)
   set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.NewCTScanner)
 endif()
+
 set_target_properties(NewCTScanner PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
@@ -103,6 +91,7 @@ set_target_properties(NewCTScanner PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
+# --- Installation rules ---
 include(GNUInstallDirs)
 install(TARGETS NewCTScanner
     BUNDLE DESTINATION .

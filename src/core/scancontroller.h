@@ -12,13 +12,15 @@ class IXRaySource;
 class DataSaver;
 class QThread;
 class ReconstructionController;
-
+class HardwareService;
+class IDetector;
+class IMotionStage;
 
 class ScanController : public QObject
 {
     Q_OBJECT
 public:
-    explicit ScanController();
+    explicit ScanController(HardwareService* hardwareService);
     ~ScanController();
     enum ScanState {
         StateIdle,
@@ -43,7 +45,8 @@ private slots:
     void onHardwareError(const QString &errorMessage);
     void onError();
     void onAcquisitionFinished();
-
+    void onMoveFinished(bool success);
+    void onFrameAcquired();
 
 signals:
     void statusUpdated(const QString &status);
@@ -57,15 +60,19 @@ signals:
     void scanProgress(int current, int total);
     void scanCompleted();
     void configurationLoaded(const ScanParameters &params);
-    // 将重建模块的信号转发给UI
     void reconstructionStarted();
     void reconstructionProgress(int percentage);
     void reconstructionFinished(const QImage &sliceImage);
 
-
-
+    void commandTurnOn(int numberOfFrames);
+    void commandTurnOff();
+    void commandSetVoltage(double kv);
+    void commandMoveTo(double position);
+    void commandAcquireFrame();
 private:
+    void startNextAcquisitionStep();
     IXRaySource* m_xraySource;
+    HardwareService* m_hardwareService;
     QStateMachine* m_stateMachine;
     QState* m_idleState;
     QState* m_preparingState;
@@ -79,8 +86,10 @@ private:
     QState* m_errorState;
     ConfigManager* m_configManager;
     ReconstructionController* m_reconController;
-    QThread* m_reconThread;
-
+    // QThread* m_reconThread;
+    IDetector* m_detector;
+    IMotionStage* m_motionStage;
+    int m_currentFrame;
 
 };
 

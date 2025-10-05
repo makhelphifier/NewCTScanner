@@ -12,9 +12,7 @@ struct ScanParameters {
 public:
     double voltage = 100.0;
     double current = 50.0;
-    int frameCount = 360; // 默认采集360帧
-    // ... (在成员变量下面)
-    // 将结构体转换为QJsonObject
+    int frameCount = 360;
     QJsonObject toJson() const {
         QJsonObject json;
         json["voltage"] = voltage;
@@ -22,8 +20,6 @@ public:
         json["frameCount"] = frameCount;
         return json;
     }
-
-    // 从QJsonObject填充结构体
     static ScanParameters fromJson(const QJsonObject &json) {
         ScanParameters params;
         if (json.contains("voltage")) params.voltage = json["voltage"].toDouble();
