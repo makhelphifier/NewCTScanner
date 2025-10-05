@@ -24,6 +24,8 @@ set(UI_SOURCES
 set(CORE_SOURCES
         src/core/scancontroller.cpp
         src/core/scancontroller.h
+        src/core/reconstructioncontroller.cpp
+        src/core/reconstructioncontroller.h
 )
 
 
@@ -54,6 +56,10 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/core/scancontroller.h src/core/scancontroller.cpp
         src/hal/IXRaySource.h
         src/hal/dummysource.h src/hal/dummysource.cpp
+        src/common/logger.h src/common/logger.cpp
+        src/core/datasaver.h src/core/datasaver.cpp
+        src/core/configmanager.h src/core/configmanager.cpp
+        src/core/reconstructioncontroller.h src/core/reconstructioncontroller.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET NewCTScanner APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

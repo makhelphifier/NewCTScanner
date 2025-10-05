@@ -5,8 +5,14 @@
 #include <QStateMachine>
 #include <QState>
 #include "common/ScanParameters.h"
-// 前向声明
+#include "common/Logger.h"
+
+class ConfigManager;
 class IXRaySource;
+class DataSaver;
+class QThread;
+class ReconstructionController;
+
 
 class ScanController : public QObject
 {
@@ -17,23 +23,27 @@ public:
     enum ScanState {
         StateIdle,
         StatePreparing,
-        StateScanning
+        StateScanning,
+        StateError
     };
 public slots:
-    // UI请求开始扫描
     void requestScan();
-    // UI请求停止/复位
     void requestStop();
     void updateParameters(const ScanParameters &params);
+    void init();
+    void updateSavePath(const QString &directory, const QString &prefix);
+    void saveConfiguration(const QString &filePath);
+    void loadConfiguration(const QString &filePath);
 
 private slots:
-    // 进入“准备”状态时执行
     void onPreparing();
-    // 进入“扫描”状态时执行
     void onScanning();
-    // 进入“空闲”状态时执行
     void onIdle();
     void onNewImageFromSource(const QImage &image);
+    void onHardwareError(const QString &errorMessage);
+    void onError();
+    void onAcquisitionFinished();
+
 
 signals:
     void statusUpdated(const QString &status);
@@ -42,19 +52,35 @@ signals:
     void preparationFinished();
     void stateChanged(ScanState newState);
     void newProjectionImage(const QImage &image);
+    void errorOccurred(const QString &errorMessage);
+    void forceErrorState();
+    void scanProgress(int current, int total);
+    void scanCompleted();
+    void configurationLoaded(const ScanParameters &params);
+    // 将重建模块的信号转发给UI
+    void reconstructionStarted();
+    void reconstructionProgress(int percentage);
+    void reconstructionFinished(const QImage &sliceImage);
+
+
 
 private:
-    // 使用接口指针，而不是具体实现
     IXRaySource* m_xraySource;
-    // 状态机和状态
     QStateMachine* m_stateMachine;
     QState* m_idleState;
     QState* m_preparingState;
     QState* m_scanningState;
-
-    // 私有方法，用于初始化状态机
     void setupStateMachine();
     ScanParameters m_currentParams;
+    DataSaver* m_dataSaver;
+    QThread* m_saverThread;
+    QString m_saveDirectory;
+    QString m_savePrefix;
+    QState* m_errorState;
+    ConfigManager* m_configManager;
+    ReconstructionController* m_reconController;
+    QThread* m_reconThread;
+
 
 };
 
