@@ -15,10 +15,9 @@ bool FrameBuffer::push(FramePtr frame, int timeout_ms)
 {
     QMutexLocker locker(&m_mutex);
 
-    // 如果缓冲区是满的，等待直到有空间或超时
     if (m_count == m_capacity) {
         if (!m_notFull.wait(&m_mutex, timeout_ms)) {
-            return false; // 超时
+            return false;
         }
     }
 
@@ -26,7 +25,6 @@ bool FrameBuffer::push(FramePtr frame, int timeout_ms)
     m_tail = (m_tail + 1) % m_capacity;
     m_count++;
 
-    // 通知可能在等待的消费者
     m_notEmpty.wakeOne();
     return true;
 }
@@ -35,10 +33,9 @@ FramePtr FrameBuffer::pop(int timeout_ms)
 {
     QMutexLocker locker(&m_mutex);
 
-    // 如果缓冲区是空的，等待直到有数据或超时
     if (m_count == 0) {
         if (!m_notEmpty.wait(&m_mutex, timeout_ms)) {
-            return nullptr; // 超时
+            return nullptr;
         }
     }
 
@@ -46,7 +43,6 @@ FramePtr FrameBuffer::pop(int timeout_ms)
     m_head = (m_head + 1) % m_capacity;
     m_count--;
 
-    // 通知可能在等待的生产者
     m_notFull.wakeOne();
     return frame;
 }
@@ -69,5 +65,5 @@ void FrameBuffer::clear()
     m_head = 0;
     m_tail = 0;
     m_count = 0;
-    m_notFull.wakeAll(); // 唤醒所有可能在等待的生产者
+    m_notFull.wakeAll();
 }

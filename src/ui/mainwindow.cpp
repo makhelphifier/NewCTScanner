@@ -100,8 +100,6 @@ MainWindow::MainWindow(QWidget *parent)
             m_scanController, &ScanController::requestScan);
     connect(m_stopButton, &QPushButton::clicked,
             m_scanController, &ScanController::requestStop);
-    // connect(m_scanController, &ScanController::statusUpdated,
-    //         this, &MainWindow::updateStatus);
 
     connect(m_scanController, &ScanController::stateChanged,
             this, &MainWindow::onStateChanged);

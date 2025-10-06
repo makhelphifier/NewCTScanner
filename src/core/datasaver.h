@@ -14,9 +14,7 @@ public:
     explicit DataSaver(QObject *parent = nullptr);
 
 public slots:
-    // 启动消费者循环
     void startConsuming(const QString &directory, const QString &prefix, FrameBuffer* sourceBuffer);
-    // 请求停止消费
     void stop();
 
 signals:

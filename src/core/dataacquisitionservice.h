@@ -1,3 +1,5 @@
+// src/core/dataacquisitionservice.h
+
 #ifndef DATAACQUISITIONSERVICE_H
 #define DATAACQUISITIONSERVICE_H
 
@@ -5,6 +7,7 @@
 #include <QThread>
 #include <memory>
 #include "core/Frame.h"
+#include "common/ScanParameters.h"
 
 class FrameBuffer;
 class AcquisitionWorker;
@@ -24,10 +27,15 @@ public slots:
     void start(const ScanParameters &params, const QString &saveDirectory, const QString &savePrefix);
     void stop();
 
+    void acquireSingleFrame();
+
 signals:
-    void acquisitionFinished();
-    void newFrameReady(FramePtr frame); // 用于实时显示
+    void newRawFrameReady(FramePtr frame);
+    void acquisitionWorkerFinished();
     void scanProgress(int current, int total);
+
+private slots:
+    void onNewFrameProduced(FramePtr frame);
 
 private:
     HardwareService* m_hardwareService;
@@ -38,6 +46,8 @@ private:
 
     QThread* m_saverThread;
     DataSaver* m_dataSaver;
+
+    ScanParameters m_currentParams;
 };
 
 #endif // DATAACQUISITIONSERVICE_H
