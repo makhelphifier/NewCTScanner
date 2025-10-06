@@ -54,7 +54,7 @@ void DataSaver::processImageQueue()
                            .arg(m_fileCounter++, 4, 10, QChar('0')); // e.g., prefix_0000.png
 
     if (image.save(filePath, "PNG")) {
-        // Log(QString("Saved image: %1").arg(filePath));
+        Log(QString("Saved image: %1").arg(filePath));
     } else {
         Log(QString("Error: Failed to save image %1").arg(filePath));
     }

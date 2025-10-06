@@ -2,6 +2,8 @@
 #define DUMMYDETECTOR_H
 
 #include "IDetector.h"
+#include "common/HardwareStatus.h"
+
 
 class DummyDetector : public IDetector
 {
@@ -14,6 +16,7 @@ public slots:
 
 private:
     int m_imageCounter;
+    DetectorStatus m_currentStatus;
 };
 
 #endif // DUMMYDETECTOR_H

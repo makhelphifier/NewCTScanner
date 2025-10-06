@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QImage>
+#include "common/HardwareStatus.h"
 
 class IDetector : public QObject
 {
@@ -18,6 +19,7 @@ signals:
     void newImageReady(const QImage &image);
     void acquisitionFinished();
     void errorOccurred(const QString &errorMessage);
+    void statusChanged(const DetectorStatus &newStatus);
 };
 
 #endif // IDETECTOR_H

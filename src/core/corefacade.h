@@ -1,5 +1,3 @@
-// src/core/corefacade.h
-
 #ifndef COREFACADE_H
 #define COREFACADE_H
 

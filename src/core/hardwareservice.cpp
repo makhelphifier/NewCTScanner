@@ -6,6 +6,7 @@
 #include "hal/IXRaySource.h"
 #include "hal/IDetector.h"
 #include "hal/IMotionStage.h"
+#include "common/HardwareStatus.h"
 
 HardwareService::HardwareService(QObject *parent)
     : QObject(parent), m_xraySource(nullptr), m_hardwareThread(nullptr)
@@ -37,6 +38,9 @@ void HardwareService::init()
     connect(m_hardwareThread, &QThread::finished, m_xraySource, &QObject::deleteLater);
     connect(m_hardwareThread, &QThread::finished, m_detector, &QObject::deleteLater);
     connect(m_hardwareThread, &QThread::finished, m_motionStage, &QObject::deleteLater);
+    connect(m_xraySource, &IXRaySource::statusChanged, this, &HardwareService::onXRayStatusChanged, Qt::QueuedConnection);
+    connect(m_detector, &IDetector::statusChanged, this, &HardwareService::onDetectorStatusChanged, Qt::QueuedConnection);
+    connect(m_motionStage, &IMotionStage::statusChanged, this, &HardwareService::onMotionStageStatusChanged, Qt::QueuedConnection);
 
     m_hardwareThread->start();
     Log("Hardware thread started.");
@@ -78,3 +82,26 @@ IXRaySource* HardwareService::xraySource() const
 }
 IDetector* HardwareService::detector() const { return m_detector; }
 IMotionStage* HardwareService::motionStage() const { return m_motionStage; }
+SystemStatus HardwareService::getSystemStatus() const
+{
+    return m_systemStatus;
+}
+
+void HardwareService::onXRayStatusChanged(const XRaySourceStatus &status)
+{
+    m_systemStatus.xrayStatus = status;
+    emit systemStatusUpdated(m_systemStatus);
+}
+
+void HardwareService::onDetectorStatusChanged(const DetectorStatus &status)
+{
+    m_systemStatus.detectorStatus = status;
+    emit systemStatusUpdated(m_systemStatus);
+}
+
+void HardwareService::onMotionStageStatusChanged(const MotionStageStatus &status)
+{
+    m_systemStatus.motionStageStatus = status;
+    emit systemStatusUpdated(m_systemStatus);
+}
+

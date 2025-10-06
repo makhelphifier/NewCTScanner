@@ -13,6 +13,8 @@ public:
 public slots:
     void moveTo(double position) override;
     void reset() override;
+private:
+    MotionStageStatus m_currentStatus;
 };
 
 #endif // DUMMYMOTIONSTAGE_H

@@ -9,12 +9,14 @@
 #include <QFileDialog>
 #include "core/corefacade.h"
 #include "core/reconstructioncontroller.h"
+#include "core/hardwareservice.h"
 
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     m_scanController = CoreFacade::instance().scanController();
+    m_hardwareService = CoreFacade::instance().hardwareService();
 
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(centralWidget);
@@ -98,8 +100,9 @@ MainWindow::MainWindow(QWidget *parent)
             m_scanController, &ScanController::requestScan);
     connect(m_stopButton, &QPushButton::clicked,
             m_scanController, &ScanController::requestStop);
-    connect(m_scanController, &ScanController::statusUpdated,
-            this, &MainWindow::updateStatus);
+    // connect(m_scanController, &ScanController::statusUpdated,
+    //         this, &MainWindow::updateStatus);
+
     connect(m_scanController, &ScanController::stateChanged,
             this, &MainWindow::onStateChanged);
     connect(m_voltageSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
@@ -124,17 +127,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scanController, &ScanController::reconstructionStarted, this, &MainWindow::onReconstructionStarted);
     connect(reconController, &ReconstructionController::reconstructionProgress, this, &MainWindow::updateReconProgress);
     connect(reconController, &ReconstructionController::reconstructionFinished, this, &MainWindow::displayReconResult);
+    connect(m_hardwareService, &HardwareService::systemStatusUpdated,
+            this, &MainWindow::onSystemStatusUpdated, Qt::QueuedConnection);
 
     onSavePathChanged();
     Log("Application started. UI is ready.");
     onParametersChanged();
-    // m_workerThread->start();
+    onSystemStatusUpdated(m_hardwareService->getSystemStatus());
 }
 
 MainWindow::~MainWindow()
 {
-    // m_workerThread->quit();
-    // m_workerThread->wait();
 }
 
 void MainWindow::updateStatus(const QString &status)
@@ -290,4 +293,23 @@ void MainWindow::displayReconResult(const QImage &sliceImage)
         Qt::KeepAspectRatio,
         Qt::SmoothTransformation
         ));
+}
+
+void MainWindow::onSystemStatusUpdated(const SystemStatus &status)
+{
+    if (!status.xrayStatus.isConnected) {
+        m_statusLabel->setText("X-Ray Source Disconnected");
+    } else {
+        QString xrayStatus = status.xrayStatus.isXRayOn ? "X-Ray ON" : "X-Ray OFF";
+        m_statusLabel->setText(
+            QString("X-Ray: %1 | Voltage: %2 kV | Temp: %3 °C")
+                .arg(xrayStatus)
+                .arg(status.xrayStatus.currentVoltage_kV, 0, 'f', 1)
+                .arg(status.xrayStatus.tubeTemperature, 0, 'f', 1)
+            );
+    }
+
+    Log(QString("Motion Stage at %1 degrees.").arg(status.motionStageStatus.currentPosition));
+
+    Log(QString("Detector frames acquired: %1").arg(status.detectorStatus.framesAcquired));
 }

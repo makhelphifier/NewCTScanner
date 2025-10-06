@@ -53,6 +53,8 @@ set(COMMON_FILES
     src/common/logger.h
     src/common/logger.cpp
     src/common/ScanParameters.h
+    src/common/HardwareStatus.h
+
 )
 
 set(PROJECT_SOURCES
@@ -69,7 +71,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-
     )
 else()
     add_executable(NewCTScanner ${PROJECT_SOURCES})

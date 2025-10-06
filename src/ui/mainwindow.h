@@ -10,10 +10,12 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QProgressBar>
-
+#include "common/HardwareStatus.h"
 
 class ScanController;
 class QPushButton;
+class HardwareService;
+
 
 class MainWindow : public QMainWindow
 {
@@ -33,6 +35,7 @@ public slots:
     void onReconstructionStarted();
     void updateReconProgress(int percentage);
     void displayReconResult(const QImage &sliceImage);
+    void onSystemStatusUpdated(const SystemStatus &status);
 
 private:
     ScanController* m_scanController;
@@ -56,6 +59,8 @@ private:
     QPushButton* m_saveConfigButton;
     QLabel* m_reconDisplayLabel;
     QProgressBar* m_reconProgressBar;
+    HardwareService* m_hardwareService;
+
 
 private slots:
     void onParametersChanged();

@@ -2,6 +2,7 @@
 #define IXRAYSOURCE_H
 #include <QObject>
 #include <QImage>
+#include "common/HardwareStatus.h"
 
 class IXRaySource: public QObject  {
     Q_OBJECT
@@ -20,6 +21,8 @@ signals:
     void hardwareError(const QString &errorMessage);
     void acquisitionProgress(int currentFrame, int totalFrames);
     void acquisitionFinished();
+    void statusChanged(const XRaySourceStatus &newStatus);
+
 };
 
 #endif // IXRAYSOURCE_H

@@ -6,6 +6,8 @@
 #include <QDebug>
 #include <QTimer>
 #include <QImage>
+#include "common/HardwareStatus.h"
+
 class DummySource :  public IXRaySource {
     Q_OBJECT
 public:
@@ -20,12 +22,15 @@ public slots:
     bool turnOff() override;
 
 private slots:
-    // void generateImage();
+    void pollStatus();
 
 private:
     QTimer* m_acquisitionTimer;
     int m_imageCounter;
     int m_totalFrames;
+    QTimer* m_statusTimer;
+    XRaySourceStatus m_currentStatus;
+
 };
 
 #endif // DUMMYSOURCE_H

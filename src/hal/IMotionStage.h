@@ -2,6 +2,7 @@
 #define IMOTIONSTAGE_H
 
 #include <QObject>
+#include "common/HardwareStatus.h"
 
 class IMotionStage : public QObject
 {
@@ -17,6 +18,8 @@ public slots:
 signals:
     void moveFinished(bool success);
     void errorOccurred(const QString &errorMessage);
+    void statusChanged(const MotionStageStatus &newStatus);
+
 };
 
 #endif // IMOTIONSTAGE_H
