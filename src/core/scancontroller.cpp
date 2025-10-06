@@ -2,7 +2,6 @@
 #include "hal/DummySource.h"
 #include <QTimer>
 #include <QDebug>
-#include "core/datasaver.h"
 #include <QThread>
 #include "core/configmanager.h"
 #include "core/reconstructioncontroller.h"
@@ -10,91 +9,59 @@
 #include <QThread>
 #include "hal/IDetector.h"
 #include "hal/IMotionStage.h"
+#include "hal/IXRaySource.h"
+#include "core/dataacquisitionservice.h"
 
-ScanController::ScanController(HardwareService* hardwareService)
-    : QObject(nullptr), m_xraySource(nullptr),
-    m_hardwareService(hardwareService)
 
+ScanController::ScanController(HardwareService* hardwareService,
+                               ConfigManager* configManager,
+                               ReconstructionController* reconController)
+    : QObject(nullptr),
+    m_hardwareService(hardwareService),
+    m_configManager(configManager),
+    m_reconController(reconController)
 {
-    m_saverThread = new QThread(this);
-    m_dataSaver = new DataSaver();
-    m_dataSaver->moveToThread(m_saverThread);
-    connect(m_saverThread, &QThread::finished, m_dataSaver, &QObject::deleteLater);
-    m_saverThread->start();
-    Log("DataSaver thread started.");
-
     setupStateMachine();
-    // m_stateMachine->start();
 
-    m_configManager = new ConfigManager(this);
     connect(m_configManager, &ConfigManager::configLoaded, this, &ScanController::configurationLoaded);
+    // connect(m_reconController, &ReconstructionController::reconstructionProgress,
+    //         this, &ScanController::reconstructionProgress);
+    // connect(m_reconController, &ReconstructionController::reconstructionFinished,
+    //         this, &ScanController::reconstructionFinished);
 
-
-    m_reconController = new ReconstructionController();
-
-    connect(m_reconController, &ReconstructionController::reconstructionProgress,
-            this, &ScanController::reconstructionProgress);
-    connect(m_reconController, &ReconstructionController::reconstructionFinished,
-            this, &ScanController::reconstructionFinished);
-
-    // connect(m_reconThread, &QThread::finished, m_reconController, &QObject::deleteLater);
-    // m_reconThread->start();
     Log("Reconstruction thread started.");
-
-
-
 }
 void ScanController::init() {
-    m_xraySource = m_hardwareService->xraySource();
-    m_detector = m_hardwareService->detector();
-    m_motionStage = m_hardwareService->motionStage();
+    IXRaySource* xraySource = m_hardwareService->xraySource();
+    IDetector* detector = m_hardwareService->detector();
+    IMotionStage* motionStage = m_hardwareService->motionStage();
 
-    if (!m_xraySource || !m_detector || !m_motionStage){
+    if (!xraySource || !detector || !motionStage){
         onHardwareError("Failed to get hardware from HardwareService.");
         return;
     }
-    // 连接来自硬件的信号
-    connect(m_detector, &IDetector::newImageReady,
+
+    connect(detector, &IDetector::newImageReady,
             this, &ScanController::onNewImageFromSource, Qt::QueuedConnection);
-    connect(m_detector, &IDetector::acquisitionFinished,
+    connect(detector, &IDetector::acquisitionFinished,
             this, &ScanController::onFrameAcquired, Qt::QueuedConnection);
-    connect(m_motionStage, &IMotionStage::moveFinished,
+    connect(motionStage, &IMotionStage::moveFinished,
             this, &ScanController::onMoveFinished, Qt::QueuedConnection);
 
-
-    if (!m_xraySource->connect()){
+    if (!xraySource->connect()){
         onHardwareError("Initial connection to X-Ray source failed.");
     }
-    connect(m_xraySource, &IXRaySource::newImageReady,
+    connect(xraySource, &IXRaySource::newImageReady,
             this, &ScanController::onNewImageFromSource);
-    connect(m_xraySource, &IXRaySource::hardwareError, this, &ScanController::onHardwareError);
-    connect(m_xraySource, &IXRaySource::acquisitionProgress, this, &ScanController::scanProgress);
-    connect(m_xraySource, &IXRaySource::acquisitionFinished, this, &ScanController::onAcquisitionFinished);
+    connect(xraySource, &IXRaySource::hardwareError, this, &ScanController::onHardwareError);
+    connect(xraySource, &IXRaySource::acquisitionProgress, this, &ScanController::scanProgress);
+    connect(xraySource, &IXRaySource::acquisitionFinished, this, &ScanController::onAcquisitionFinished);
 
-
-    connect(this, &ScanController::commandTurnOn,
-            m_xraySource, &IXRaySource::turnOn, Qt::QueuedConnection);
-    connect(this, &ScanController::commandTurnOff,
-            m_xraySource, &IXRaySource::turnOff, Qt::QueuedConnection);
-    connect(this, &ScanController::commandSetVoltage,
-            m_xraySource, &IXRaySource::setVoltage, Qt::QueuedConnection);
-
-    connect(this, &ScanController::commandMoveTo,
-            m_motionStage, &IMotionStage::moveTo, Qt::QueuedConnection);
-    connect(this, &ScanController::commandAcquireFrame,
-            m_detector, &IDetector::acquireFrame, Qt::QueuedConnection);
-    m_stateMachine->start();
-
+    QTimer::singleShot(0, m_stateMachine, &QStateMachine::start);
     Log("ScanController initialized and connected to hardware signals.");
-
 }
 ScanController::~ScanController()
 {
-    m_saverThread->quit();
-    m_saverThread->wait();
-
-    // m_reconThread->quit();
-    // m_reconThread->wait();
 }
 void ScanController::requestScan()
 {
@@ -137,18 +104,14 @@ void ScanController::setupStateMachine()
     m_errorState->addTransition(this, &ScanController::stopRequested, m_idleState);
     m_scanningState->addTransition(this, &ScanController::scanCompleted, m_idleState);
 
-    // m_stateMachine->addState(m_idleState);
-    // m_stateMachine->addState(m_preparingState);
-    // m_stateMachine->addState(m_scanningState);
-
     m_stateMachine->setInitialState(m_idleState);
 }
 
 void ScanController::onIdle()
 {
-    QMetaObject::invokeMethod(m_dataSaver, "stopSaving", Qt::QueuedConnection);
+    emit commandStopSaving();
     emit statusUpdated("Idle");
-    if (m_xraySource) emit commandTurnOff();
+    if (m_hardwareService) m_hardwareService->turnOffXRay();
     emit stateChanged(StateIdle);
     Log("State machine entered Idle state.");
 
@@ -168,15 +131,13 @@ void ScanController::onPreparing()
 void ScanController::onScanning()
 {
     m_currentFrame = 0;
-    QMetaObject::invokeMethod(m_dataSaver, "startSaving", Qt::QueuedConnection,
-                              Q_ARG(QString, m_saveDirectory),
-                              Q_ARG(QString, m_savePrefix));
+    emit commandStartSaving(m_saveDirectory, m_savePrefix);
     emit statusUpdated("Scanning... X-Ray is ON");
     emit stateChanged(StateScanning);
 
-    if (m_xraySource) {
-        emit commandSetVoltage(m_currentParams.voltage);
-        emit commandTurnOn(0);
+    if (m_hardwareService) {
+        m_hardwareService->setVoltage(m_currentParams.voltage);
+        m_hardwareService->turnOnXRay();
     }
 
     QTimer::singleShot(500, this, &ScanController::startNextAcquisitionStep);
@@ -195,9 +156,7 @@ void ScanController::updateParameters(const ScanParameters &params)
 void ScanController::onNewImageFromSource(const QImage &image)
 {
     emit newProjectionImage(image);
-
-    QMetaObject::invokeMethod(m_dataSaver, "queueImage", Qt::QueuedConnection,
-                              Q_ARG(QImage, image));
+    emit commandSaveImage(image);
 }
 void ScanController::updateSavePath(const QString &directory, const QString &prefix)
 {
@@ -215,22 +174,28 @@ void ScanController::onError()
 {
     emit statusUpdated("Error! Please reset.");
     emit stateChanged(StateError);
-    if (m_xraySource) emit commandTurnOff();
-    QMetaObject::invokeMethod(m_dataSaver, "stopSaving", Qt::QueuedConnection);
+    if (m_hardwareService) m_hardwareService->turnOffXRay();
+    emit commandStopSaving();
 }
 
 void ScanController::onAcquisitionFinished()
 {
     Log("ScanController: All frames acquired. Turning off X-Ray and triggering reconstruction.");
 
-    if (m_xraySource) emit commandTurnOff();
+    if (m_hardwareService) m_hardwareService->turnOffXRay();
     emit scanCompleted();
 
     emit reconstructionStarted();
 
-    QMetaObject::invokeMethod(m_reconController, "startReconstruction", Qt::QueuedConnection,
-                              Q_ARG(QString, m_saveDirectory));
+    // QMetaObject::invokeMethod(m_reconController, "startReconstruction", Qt::QueuedConnection,
+    //                           Q_ARG(QString, m_saveDirectory));
 }
+
+QString ScanController::getSaveDirectory() const
+{
+    return m_saveDirectory;
+}
+
 void ScanController::saveConfiguration(const QString &filePath)
 {
     m_configManager->saveConfig(m_currentParams, filePath);
@@ -251,7 +216,7 @@ void ScanController::startNextAcquisitionStep()
     emit scanProgress(m_currentFrame + 1, m_currentParams.frameCount);
 
     double nextAngle = (360.0 / m_currentParams.frameCount) * m_currentFrame;
-    emit commandMoveTo(nextAngle);
+    m_hardwareService->moveTo(nextAngle);
 }
 
 void ScanController::onMoveFinished(bool success)
@@ -260,7 +225,7 @@ void ScanController::onMoveFinished(bool success)
         onHardwareError("Motion stage failed to move.");
         return;
     }
-    emit commandAcquireFrame();
+    m_hardwareService->acquireFrame();
 }
 
 void ScanController::onFrameAcquired()

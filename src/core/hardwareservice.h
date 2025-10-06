@@ -16,6 +16,12 @@ public:
     ~HardwareService();
 
     void init();
+public slots:
+    void setVoltage(double kv);
+    void turnOnXRay();
+    void turnOffXRay();
+    void moveTo(double position);
+    void acquireFrame();
 
     IXRaySource* xraySource() const;
     IDetector* detector() const;

@@ -2,7 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QThread>
 #include <QLabel>
 #include "core/scancontroller.h"
 #include <QDoubleSpinBox>
@@ -13,7 +12,6 @@
 #include <QProgressBar>
 
 
-class HardwareService;
 class ScanController;
 class QPushButton;
 
@@ -37,9 +35,7 @@ public slots:
     void displayReconResult(const QImage &sliceImage);
 
 private:
-    HardwareService* m_hardwareService;
     ScanController* m_scanController;
-
     QPushButton* m_startXRayButton;
     QPushButton* m_stopButton;
 

@@ -15,12 +15,16 @@ class ReconstructionController;
 class HardwareService;
 class IDetector;
 class IMotionStage;
+class DataAcquisitionService;
+
 
 class ScanController : public QObject
 {
     Q_OBJECT
 public:
-    explicit ScanController(HardwareService* hardwareService);
+    explicit ScanController(HardwareService* hardwareService,
+                            ConfigManager* configManager,
+                            ReconstructionController* reconController);
     ~ScanController();
     enum ScanState {
         StateIdle,
@@ -28,6 +32,8 @@ public:
         StateScanning,
         StateError
     };
+    QString getSaveDirectory() const;
+
 public slots:
     void requestScan();
     void requestStop();
@@ -63,30 +69,26 @@ signals:
     void reconstructionStarted();
     void reconstructionProgress(int percentage);
     void reconstructionFinished(const QImage &sliceImage);
+    void commandStartSaving(const QString &directory, const QString &prefix);
+    void commandStopSaving();
+    void commandSaveImage(const QImage &image);
 
-    void commandTurnOn(int numberOfFrames);
-    void commandTurnOff();
-    void commandSetVoltage(double kv);
-    void commandMoveTo(double position);
-    void commandAcquireFrame();
 private:
     void startNextAcquisitionStep();
-    IXRaySource* m_xraySource;
     HardwareService* m_hardwareService;
     QStateMachine* m_stateMachine;
+    DataAcquisitionService* m_dataAcquisitionService;
+
     QState* m_idleState;
     QState* m_preparingState;
     QState* m_scanningState;
     void setupStateMachine();
     ScanParameters m_currentParams;
-    DataSaver* m_dataSaver;
-    QThread* m_saverThread;
     QString m_saveDirectory;
     QString m_savePrefix;
     QState* m_errorState;
     ConfigManager* m_configManager;
     ReconstructionController* m_reconController;
-    // QThread* m_reconThread;
     IDetector* m_detector;
     IMotionStage* m_motionStage;
     int m_currentFrame;

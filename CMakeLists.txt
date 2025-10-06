@@ -19,6 +19,10 @@ set(UI_FILES
 )
 
 set(CORE_FILES
+    src/core/dataacquisitionservice.h
+    src/core/dataacquisitionservice.cpp
+    src/core/corefacade.h
+    src/core/corefacade.cpp
     src/core/configmanager.h
     src/core/configmanager.cpp
     src/core/datasaver.h

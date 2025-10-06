@@ -7,21 +7,14 @@
 #include <QMessageBox>
 #include <QSpinBox>
 #include <QFileDialog>
-#include "core/hardwareservice.h"
+#include "core/corefacade.h"
+#include "core/reconstructioncontroller.h"
 
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    m_hardwareService = new HardwareService(this);
-    m_hardwareService->init();
-
-    m_workerThread = new QThread(this);
-    m_scanController = new ScanController(m_hardwareService);
-
-    m_scanController->moveToThread(m_workerThread);
-    connect(m_workerThread, &QThread::started, m_scanController, &ScanController::init);
-    connect(m_workerThread, &QThread::finished, m_scanController, &QObject::deleteLater);
+    m_scanController = CoreFacade::instance().scanController();
 
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(centralWidget);
@@ -127,20 +120,21 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scanController, &ScanController::scanProgress, this, &MainWindow::updateScanProgress);
     connect(m_loadConfigButton, &QPushButton::clicked, this, &MainWindow::onLoadConfig);
     connect(m_saveConfigButton, &QPushButton::clicked, this, &MainWindow::onSaveConfig);
+    ReconstructionController* reconController = CoreFacade::instance().reconstructionController();
     connect(m_scanController, &ScanController::reconstructionStarted, this, &MainWindow::onReconstructionStarted);
-    connect(m_scanController, &ScanController::reconstructionProgress, this, &MainWindow::updateReconProgress);
-    connect(m_scanController, &ScanController::reconstructionFinished, this, &MainWindow::displayReconResult);
-    connect(m_scanController, &ScanController::configurationLoaded, this, &MainWindow::applyLoadedParameters);
+    connect(reconController, &ReconstructionController::reconstructionProgress, this, &MainWindow::updateReconProgress);
+    connect(reconController, &ReconstructionController::reconstructionFinished, this, &MainWindow::displayReconResult);
+
     onSavePathChanged();
     Log("Application started. UI is ready.");
     onParametersChanged();
-    m_workerThread->start();
+    // m_workerThread->start();
 }
 
 MainWindow::~MainWindow()
 {
-    m_workerThread->quit();
-    m_workerThread->wait();
+    // m_workerThread->quit();
+    // m_workerThread->wait();
 }
 
 void MainWindow::updateStatus(const QString &status)
