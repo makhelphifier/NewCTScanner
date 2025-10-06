@@ -2,32 +2,29 @@
 #define DATASAVER_H
 
 #include <QObject>
-#include <QImage>
 #include <QString>
-#include <QQueue>
-#include <QMutex>
+#include <atomic>
+#include "core/FrameBuffer.h"
 
 class DataSaver : public QObject
 {
     Q_OBJECT
+
 public:
     explicit DataSaver(QObject *parent = nullptr);
 
 public slots:
-    void startSaving(const QString &directory, const QString &prefix);
-    void stopSaving();
-    void queueImage(const QImage &image);
+    // 启动消费者循环
+    void startConsuming(const QString &directory, const QString &prefix, FrameBuffer* sourceBuffer);
+    // 请求停止消费
+    void stop();
+
+signals:
+    void finished();
 
 private:
-    void processImageQueue();
-
-    QString m_directory;
-    QString m_prefix;
-    int m_fileCounter;
-    bool m_isSaving;
-
-    QQueue<QImage> m_imageQueue;
-    QMutex m_queueMutex;
+    FrameBuffer* m_sourceBuffer = nullptr;
+    std::atomic<bool> m_stopRequested;
 };
 
 #endif // DATASAVER_H

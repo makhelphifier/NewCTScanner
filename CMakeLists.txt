@@ -35,6 +35,11 @@ set(CORE_FILES
     src/core/scancontroller.cpp
     src/core/reconstructiontask.h
     src/core/reconstructiontask.cpp
+    src/core/Frame.h
+    src/core/framebuffer.h
+    src/core/framebuffer.cpp
+    src/core/acquisitionworker.h
+    src/core/acquisitionworker.cpp
 )
 
 set(HAL_FILES
@@ -71,6 +76,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+
     )
 else()
     add_executable(NewCTScanner ${PROJECT_SOURCES})

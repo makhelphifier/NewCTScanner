@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
     qRegisterMetaType<MotionStageStatus>("MotionStageStatus");
     qRegisterMetaType<DetectorStatus>("DetectorStatus");
     qRegisterMetaType<SystemStatus>("SystemStatus");
+    qRegisterMetaType<FramePtr>("FramePtr");
 
     QApplication a(argc, argv);
 

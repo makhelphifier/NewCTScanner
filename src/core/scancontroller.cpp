@@ -1,78 +1,39 @@
 #include "scancontroller.h"
-#include "hal/DummySource.h"
-#include <QTimer>
-#include <QDebug>
-#include <QThread>
 #include "core/configmanager.h"
 #include "core/reconstructioncontroller.h"
-#include "core/hardwareservice.h"
-#include <QThread>
-#include "hal/IDetector.h"
-#include "hal/IMotionStage.h"
-#include "hal/IXRaySource.h"
 #include "core/dataacquisitionservice.h"
+#include <QTimer>
+#include <QDebug>
 
-
-ScanController::ScanController(HardwareService* hardwareService,
+ScanController::ScanController(DataAcquisitionService* dataAcquisitionService,
                                ConfigManager* configManager,
                                ReconstructionController* reconController)
     : QObject(nullptr),
-    m_hardwareService(hardwareService),
+    m_dataAcquisitionService(dataAcquisitionService),
     m_configManager(configManager),
     m_reconController(reconController)
 {
     setupStateMachine();
-
     connect(m_configManager, &ConfigManager::configLoaded, this, &ScanController::configurationLoaded);
-    // connect(m_reconController, &ReconstructionController::reconstructionProgress,
-    //         this, &ScanController::reconstructionProgress);
-    // connect(m_reconController, &ReconstructionController::reconstructionFinished,
-    //         this, &ScanController::reconstructionFinished);
-
-    Log("Reconstruction thread started.");
 }
+
+ScanController::~ScanController() {}
+
 void ScanController::init() {
-    IXRaySource* xraySource = m_hardwareService->xraySource();
-    IDetector* detector = m_hardwareService->detector();
-    IMotionStage* motionStage = m_hardwareService->motionStage();
-
-    if (!xraySource || !detector || !motionStage){
-        onHardwareError("Failed to get hardware from HardwareService.");
-        return;
-    }
-
-    connect(detector, &IDetector::newImageReady,
-            this, &ScanController::onNewImageFromSource, Qt::QueuedConnection);
-    connect(detector, &IDetector::acquisitionFinished,
-            this, &ScanController::onFrameAcquired, Qt::QueuedConnection);
-    connect(motionStage, &IMotionStage::moveFinished,
-            this, &ScanController::onMoveFinished, Qt::QueuedConnection);
-
-    if (!xraySource->connect()){
-        onHardwareError("Initial connection to X-Ray source failed.");
-    }
-    connect(xraySource, &IXRaySource::newImageReady,
-            this, &ScanController::onNewImageFromSource);
-    connect(xraySource, &IXRaySource::hardwareError, this, &ScanController::onHardwareError);
-    connect(xraySource, &IXRaySource::acquisitionProgress, this, &ScanController::scanProgress);
-    connect(xraySource, &IXRaySource::acquisitionFinished, this, &ScanController::onAcquisitionFinished);
-
     QTimer::singleShot(0, m_stateMachine, &QStateMachine::start);
-    Log("ScanController initialized and connected to hardware signals.");
+    Log("ScanController initialized.");
 }
-ScanController::~ScanController()
-{
-}
+
 void ScanController::requestScan()
 {
     emit scanRequested();
     Log("UI requested to start scan.");
-
 }
 
 void ScanController::requestStop()
 {
-    qDebug() << "Stop requested by UI.";
+    Log("UI requested to stop scan.");
+    m_dataAcquisitionService->stop();
     emit stopRequested();
 }
 
@@ -91,104 +52,79 @@ void ScanController::setupStateMachine()
     connect(m_scanningState, &QState::entered, this, &ScanController::onScanning);
 
     m_idleState->addTransition(this, &ScanController::scanRequested, m_preparingState);
-
     m_preparingState->addTransition(this, &ScanController::preparationFinished, m_scanningState);
+    m_scanningState->addTransition(this, &ScanController::scanCompleted, m_idleState);
 
+    // Stop/Reset transitions
     m_scanningState->addTransition(this, &ScanController::stopRequested, m_idleState);
     m_preparingState->addTransition(this, &ScanController::stopRequested, m_idleState);
+    m_errorState->addTransition(this, &ScanController::stopRequested, m_idleState);
 
+    // Error transitions
     m_idleState->addTransition(this, &ScanController::forceErrorState, m_errorState);
     m_preparingState->addTransition(this, &ScanController::forceErrorState, m_errorState);
     m_scanningState->addTransition(this, &ScanController::forceErrorState, m_errorState);
 
-    m_errorState->addTransition(this, &ScanController::stopRequested, m_idleState);
-    m_scanningState->addTransition(this, &ScanController::scanCompleted, m_idleState);
 
     m_stateMachine->setInitialState(m_idleState);
 }
 
 void ScanController::onIdle()
 {
-    emit commandStopSaving();
     emit statusUpdated("Idle");
-    if (m_hardwareService) m_hardwareService->turnOffXRay();
     emit stateChanged(StateIdle);
     Log("State machine entered Idle state.");
-
 }
 
 void ScanController::onPreparing()
 {
     emit statusUpdated("Preparing...");
     emit stateChanged(StatePreparing);
-    QTimer::singleShot(2000, this, [this](){
+    // 可以在此做一些硬件预热等操作
+    QTimer::singleShot(1000, this, [this](){ // 模拟准备时间
         emit preparationFinished();
     });
     Log("State machine entered Preparing state.");
-
 }
 
 void ScanController::onScanning()
 {
-    m_currentFrame = 0;
-    emit commandStartSaving(m_saveDirectory, m_savePrefix);
     emit statusUpdated("Scanning... X-Ray is ON");
     emit stateChanged(StateScanning);
 
-    if (m_hardwareService) {
-        m_hardwareService->setVoltage(m_currentParams.voltage);
-        m_hardwareService->turnOnXRay();
-    }
-
-    QTimer::singleShot(500, this, &ScanController::startNextAcquisitionStep);
-
-    Log(QString("State machine entered Scanning state with params: kV=%1, uA=%2").arg(m_currentParams.voltage).arg(m_currentParams.current));
-}
-
-void ScanController::updateParameters(const ScanParameters &params)
-{
-    m_currentParams = params;
-    qDebug() << "Parameters updated in Core: kV=" << m_currentParams.voltage
-             << "uA=" << m_currentParams.current;
-    Log(QString("Scan parameters updated: kV=%1, uA=%2").arg(params.voltage).arg(params.current));
-}
-
-void ScanController::onNewImageFromSource(const QImage &image)
-{
-    emit newProjectionImage(image);
-    emit commandSaveImage(image);
-}
-void ScanController::updateSavePath(const QString &directory, const QString &prefix)
-{
-    m_saveDirectory = directory;
-    m_savePrefix = prefix;
-    Log(QString("Save path updated. Dir: %1, Prefix: %2").arg(directory).arg(prefix));
-}
-void ScanController::onHardwareError(const QString &errorMessage)
-{
-    emit errorOccurred(errorMessage);
-    emit forceErrorState();
+    Log("State machine entered Scanning state. Delegating to DataAcquisitionService.");
+    // 将采集任务全权委托给DataAcquisitionService
+    m_dataAcquisitionService->start(m_currentParams, m_saveDirectory, m_savePrefix);
 }
 
 void ScanController::onError()
 {
     emit statusUpdated("Error! Please reset.");
     emit stateChanged(StateError);
-    if (m_hardwareService) m_hardwareService->turnOffXRay();
-    emit commandStopSaving();
+    m_dataAcquisitionService->stop();
 }
 
 void ScanController::onAcquisitionFinished()
 {
-    Log("ScanController: All frames acquired. Turning off X-Ray and triggering reconstruction.");
-
-    if (m_hardwareService) m_hardwareService->turnOffXRay();
+    Log("ScanController: Notified that acquisition is finished. Completing scan.");
     emit scanCompleted();
-
     emit reconstructionStarted();
 
-    // QMetaObject::invokeMethod(m_reconController, "startReconstruction", Qt::QueuedConnection,
-    //                           Q_ARG(QString, m_saveDirectory));
+    QMetaObject::invokeMethod(m_reconController, "startReconstruction", Qt::QueuedConnection,
+                              Q_ARG(QString, m_saveDirectory));
+}
+
+void ScanController::updateParameters(const ScanParameters &params)
+{
+    m_currentParams = params;
+    Log(QString("Scan parameters updated: kV=%1, uA=%2, Frames=%3").arg(params.voltage).arg(params.current).arg(params.frameCount));
+}
+
+void ScanController::updateSavePath(const QString &directory, const QString &prefix)
+{
+    m_saveDirectory = directory;
+    m_savePrefix = prefix;
+    Log(QString("Save path updated. Dir: %1, Prefix: %2").arg(directory).arg(prefix));
 }
 
 QString ScanController::getSaveDirectory() const
@@ -204,32 +140,4 @@ void ScanController::saveConfiguration(const QString &filePath)
 void ScanController::loadConfiguration(const QString &filePath)
 {
     m_configManager->loadConfig(filePath);
-}
-
-void ScanController::startNextAcquisitionStep()
-{
-    if (m_currentFrame >= m_currentParams.frameCount) {
-        onAcquisitionFinished();
-        return;
-    }
-
-    emit scanProgress(m_currentFrame + 1, m_currentParams.frameCount);
-
-    double nextAngle = (360.0 / m_currentParams.frameCount) * m_currentFrame;
-    m_hardwareService->moveTo(nextAngle);
-}
-
-void ScanController::onMoveFinished(bool success)
-{
-    if (!success) {
-        onHardwareError("Motion stage failed to move.");
-        return;
-    }
-    m_hardwareService->acquireFrame();
-}
-
-void ScanController::onFrameAcquired()
-{
-    m_currentFrame++;
-    startNextAcquisitionStep();
 }

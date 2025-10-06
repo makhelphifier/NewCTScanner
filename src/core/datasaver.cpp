@@ -1,65 +1,53 @@
 #include "datasaver.h"
 #include "common/Logger.h"
 #include <QDir>
-#include <QTimer>
+#include <QThread>
 
 DataSaver::DataSaver(QObject *parent)
-    : QObject(parent), m_fileCounter(0), m_isSaving(false) {}
+    : QObject(parent), m_stopRequested(false) {}
 
-void DataSaver::startSaving(const QString &directory, const QString &prefix)
+void DataSaver::stop()
 {
-    Log(QString("DataSaver: Starting save session. Dir: %1, Prefix: %2").arg(directory).arg(prefix));
-    m_directory = directory;
-    m_prefix = prefix;
-    m_fileCounter = 0;
-    m_isSaving = true;
+    Log("DataSaver: Stop requested.");
+    m_stopRequested = true;
+}
 
-    QDir dir(m_directory);
+void DataSaver::startConsuming(const QString &directory, const QString &prefix, FrameBuffer *sourceBuffer)
+{
+    Log(QString("DataSaver: Starting consuming loop. Dir: %1").arg(directory));
+    m_stopRequested = false;
+    m_sourceBuffer = sourceBuffer;
+
+    QDir dir(directory);
     if (!dir.exists()) {
         dir.mkpath(".");
     }
 
-    QTimer::singleShot(0, this, &DataSaver::processImageQueue);
-}
+    int fileCounter = 0;
+    while (!m_stopRequested)
+    {
+        // 尝试从缓冲区弹出一帧，最多等待100ms
+        FramePtr frame = m_sourceBuffer->pop(100);
 
-void DataSaver::stopSaving()
-{
-    Log("DataSaver: Stopping save session.");
-    m_isSaving = false;
-}
+        if (frame) { // 如果成功获取到帧
+            QString filePath = QString("%1/%2_%3.png")
+                                   .arg(directory)
+                                   .arg(prefix)
+                                   .arg(++fileCounter, 4, 10, QChar('0'));
 
-void DataSaver::queueImage(const QImage &image)
-{
-    if (!m_isSaving) return;
-
-    QMutexLocker locker(&m_queueMutex);
-    m_imageQueue.enqueue(image);
-
-    QTimer::singleShot(0, this, &DataSaver::processImageQueue);
-}
-
-void DataSaver::processImageQueue()
-{
-    QMutexLocker locker(&m_queueMutex);
-    if (m_imageQueue.isEmpty() || !m_isSaving) {
-        return;
+            if (!frame->image.save(filePath, "PNG")) {
+                Log(QString("Error: Failed to save image %1").arg(filePath));
+            }
+        } else {
+            // 如果超时了还没拿到 frame，检查下是不是采集已经结束并且缓冲区也空了
+            if (m_sourceBuffer->isEmpty()) {
+                // 可以加一个更复杂的逻辑，比如等待worker线程结束后再退出
+                // 为简化，我们这里只做短暂sleep
+                QThread::msleep(10);
+            }
+        }
     }
 
-    QImage image = m_imageQueue.dequeue();
-    locker.unlock();
-
-    QString filePath = QString("%1/%2_%3.png")
-                           .arg(m_directory)
-                           .arg(m_prefix)
-                           .arg(m_fileCounter++, 4, 10, QChar('0')); // e.g., prefix_0000.png
-
-    if (image.save(filePath, "PNG")) {
-        Log(QString("Saved image: %1").arg(filePath));
-    } else {
-        Log(QString("Error: Failed to save image %1").arg(filePath));
-    }
-
-    if(m_isSaving && !m_imageQueue.isEmpty()){
-        QTimer::singleShot(0, this, &DataSaver::processImageQueue);
-    }
+    Log("DataSaver: Consuming loop finished.");
+    emit finished();
 }

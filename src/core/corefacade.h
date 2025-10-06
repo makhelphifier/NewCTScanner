@@ -11,6 +11,7 @@ class ReconstructionController;
 class DataAcquisitionService;
 class ConfigManager;
 class ReconstructionController;
+class DataAcquisitionService;
 
 class CoreFacade : public QObject
 {
