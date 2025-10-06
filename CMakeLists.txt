@@ -40,6 +40,8 @@ set(CORE_FILES
     src/core/framebuffer.cpp
     src/core/acquisitionworker.h
     src/core/acquisitionworker.cpp
+    src/core/systemsafetyservice.h
+     src/core/systemsafetyservice.cpp
 )
 
 set(HAL_FILES
@@ -59,6 +61,7 @@ set(COMMON_FILES
     src/common/logger.cpp
     src/common/ScanParameters.h
     src/common/HardwareStatus.h
+    src/common/ScanProgress.h # <-- 将新文件添加在这里
 
 )
 
@@ -76,6 +79,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(NewCTScanner
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        src/common/ScanProgress.h
+        src/core/systemsafetyservice.h src/core/systemsafetyservice.cpp
 
     )
 else()

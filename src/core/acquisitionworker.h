@@ -5,7 +5,7 @@
 #include <atomic>
 #include "core/framebuffer.h"
 #include "common/ScanParameters.h"
-
+#include "common/ScanProgress.h"
 class HardwareService;
 
 class AcquisitionWorker : public QObject
@@ -25,7 +25,7 @@ signals:
     void finished();
     void error(const QString &message);
     void newFrameProduced(FramePtr frame);
-    void progressUpdated(int current, int total);
+    void progressUpdated(const ScanProgress &progress);
 
 private slots:
     void onFrameAcquired(const QImage &image);

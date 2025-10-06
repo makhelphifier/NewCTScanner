@@ -14,6 +14,7 @@ public slots:
 
     virtual void moveTo(double position) = 0;
     virtual void reset() = 0;
+    virtual void setSpeed(double speed_deg_per_sec) = 0;
 
 signals:
     void moveFinished(bool success);

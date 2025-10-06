@@ -12,7 +12,7 @@ class DataAcquisitionService;
 class ConfigManager;
 class ReconstructionController;
 class DataAcquisitionService;
-
+class SystemSafetyService;
 class CoreFacade : public QObject
 {
     Q_OBJECT
@@ -23,6 +23,7 @@ private:
 public:
     CoreFacade(const CoreFacade&) = delete;
     CoreFacade& operator=(const CoreFacade&) = delete;
+    SystemSafetyService* safetyService() const;
 
     static CoreFacade& instance();
 
@@ -40,6 +41,7 @@ private:
     QScopedPointer<DataAcquisitionService> m_dataAcquisitionService;
     QScopedPointer<ConfigManager> m_configManager;
     QScopedPointer<ReconstructionController> m_reconController;
+    QScopedPointer<SystemSafetyService> m_safetyService;
 
 };
 

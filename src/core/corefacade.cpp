@@ -8,6 +8,7 @@
 #include "core/dataacquisitionservice.h"
 #include "configmanager.h"
 #include "reconstructioncontroller.h"
+#include "systemsafetyservice.h"
 
 CoreFacade::CoreFacade(QObject *parent) : QObject(parent)
 {
@@ -16,12 +17,15 @@ CoreFacade::CoreFacade(QObject *parent) : QObject(parent)
     m_dataAcquisitionService.reset(new DataAcquisitionService(m_hardwareService.data()));
     m_configManager.reset(new ConfigManager());
     m_reconController.reset(new ReconstructionController());
+    m_safetyService.reset(new SystemSafetyService());
 
     m_scanController.reset(new ScanController(
         m_hardwareService.data(),
         m_dataAcquisitionService.data(),
         m_configManager.data(),
-        m_reconController.data()
+        m_reconController.data(),
+        m_safetyService.data() // <-- 3. 传递给 ScanController
+
         ));
 }
 
@@ -44,11 +48,6 @@ void CoreFacade::init()
 
     connect(m_dataAcquisitionService.data(), &DataAcquisitionService::newRawFrameReady,
             m_scanController.data(), &ScanController::onRawFrameReady);
-
-
-    connect(m_dataAcquisitionService.data(), &DataAcquisitionService::scanProgress,
-            m_scanController.data(), &ScanController::scanProgress);
-
 
     QThread* scanControllerThread = new QThread();
     m_scanController->moveToThread(scanControllerThread);
@@ -85,3 +84,8 @@ ReconstructionController* CoreFacade::reconstructionController() const
 {
     return m_reconController.data();
 }
+SystemSafetyService* CoreFacade::safetyService() const
+{
+    return m_safetyService.data();
+}
+

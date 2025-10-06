@@ -1,4 +1,3 @@
-// src/core/dataacquisitionservice.h
 
 #ifndef DATAACQUISITIONSERVICE_H
 #define DATAACQUISITIONSERVICE_H
@@ -8,7 +7,7 @@
 #include <memory>
 #include "core/Frame.h"
 #include "common/ScanParameters.h"
-
+#include "common/ScanProgress.h"
 class FrameBuffer;
 class AcquisitionWorker;
 class DataSaver;
@@ -32,7 +31,7 @@ public slots:
 signals:
     void newRawFrameReady(FramePtr frame);
     void acquisitionWorkerFinished();
-    void scanProgress(int current, int total);
+    void scanProgress(const ScanProgress &progress);
 
 private slots:
     void onNewFrameProduced(FramePtr frame);

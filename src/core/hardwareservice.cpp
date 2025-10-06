@@ -105,3 +105,7 @@ void HardwareService::onMotionStageStatusChanged(const MotionStageStatus &status
     emit systemStatusUpdated(m_systemStatus);
 }
 
+void HardwareService::setMotionSpeed(double speed_deg_per_sec)
+{
+    QMetaObject::invokeMethod(m_motionStage, "setSpeed", Qt::QueuedConnection, Q_ARG(double, speed_deg_per_sec));
+}

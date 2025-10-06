@@ -11,10 +11,12 @@
 #include <QLineEdit>
 #include <QProgressBar>
 #include "common/HardwareStatus.h"
+#include "common/ScanProgress.h"
 
 class ScanController;
 class QPushButton;
 class HardwareService;
+class SystemSafetyService;
 
 
 class MainWindow : public QMainWindow
@@ -30,19 +32,17 @@ public slots:
     void updateImage(const QImage &image);
     void appendLogMessage(const QString &message);
     void displayError(const QString &errorMessage);
-    void updateScanProgress(int current, int total);
     void applyLoadedParameters(const ScanParameters &params);
     void onReconstructionStarted();
     void updateReconProgress(int percentage);
     void displayReconResult(const QImage &sliceImage);
     void onSystemStatusUpdated(const SystemStatus &status);
+    void updateScanProgress(const ScanProgress &progress);
 
 private:
     ScanController* m_scanController;
     QPushButton* m_startXRayButton;
     QPushButton* m_stopButton;
-
-
     QThread* m_workerThread;
     QLabel* m_statusLabel;
     QDoubleSpinBox* m_voltageSpinBox;
@@ -60,7 +60,13 @@ private:
     QLabel* m_reconDisplayLabel;
     QProgressBar* m_reconProgressBar;
     HardwareService* m_hardwareService;
-
+    QPushButton* m_pauseButton;
+    QPushButton* m_resumeButton;
+    QDoubleSpinBox* m_startAngleSpinBox;
+    QDoubleSpinBox* m_endAngleSpinBox;
+    QDoubleSpinBox* m_rotationSpeedSpinBox;
+    SystemSafetyService* m_safetyService;
+    QPushButton* m_doorButton;
 
 private slots:
     void onParametersChanged();
@@ -68,6 +74,8 @@ private slots:
     void browseForDirectory();
     void onSaveConfig();
     void onLoadConfig();
+    void onDoorButtonClicked();
+
 signals:
     void parametersChanged(const ScanParameters &params);
     void savePathChanged(const QString &directory, const QString &prefix);

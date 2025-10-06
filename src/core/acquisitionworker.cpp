@@ -24,7 +24,6 @@ void AcquisitionWorker::doAcquisition(const ScanParameters &params)
 
     connect(m_hardwareService->detector(), &IDetector::newImageReady, this, &AcquisitionWorker::onFrameAcquired);
 
-    m_hardwareService->turnOnXRay();
     acquireNextFrame();
 }
 
@@ -37,14 +36,16 @@ void AcquisitionWorker::stop()
 void AcquisitionWorker::acquireNextFrame()
 {
     if (m_stopRequested || m_currentFrame >= m_totalFrames) {
-        m_hardwareService->turnOffXRay();
         Log("AcquisitionWorker: Acquisition finished.");
         disconnect(m_hardwareService->detector(), &IDetector::newImageReady, this, &AcquisitionWorker::onFrameAcquired);
         emit finished();
         return;
     }
 
-    emit progressUpdated(m_currentFrame + 1, m_totalFrames);
+    ScanProgress progress;
+    progress.currentProjection = m_currentFrame + 1;
+    progress.totalProjections = m_totalFrames;
+    emit progressUpdated(progress);
 
     m_hardwareService->acquireFrame();
 }

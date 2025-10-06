@@ -3,6 +3,7 @@
 #include "core/corefacade.h"
 #include <QApplication>
 #include "common/HardwareStatus.h"
+#include "common/ScanProgress.h"
 
 int main(int argc, char *argv[])
 {
@@ -13,6 +14,7 @@ int main(int argc, char *argv[])
     qRegisterMetaType<DetectorStatus>("DetectorStatus");
     qRegisterMetaType<SystemStatus>("SystemStatus");
     qRegisterMetaType<FramePtr>("FramePtr");
+    qRegisterMetaType<ScanProgress>("ScanProgress");
 
     QApplication a(argc, argv);
 

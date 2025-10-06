@@ -9,11 +9,15 @@
 #include "common/ScanParameters.h"
 #include "common/Logger.h"
 #include "core/Frame.h"
+#include <QState>
+#include "common/ScanProgress.h"
+#include <QElapsedTimer>
 
 class ConfigManager;
 class ReconstructionController;
 class HardwareService;
 class DataAcquisitionService;
+class SystemSafetyService;
 
 class ScanController : public QObject
 {
@@ -22,13 +26,15 @@ public:
     explicit ScanController(HardwareService* hardwareService,
                             DataAcquisitionService* dataAcquisitionService,
                             ConfigManager* configManager,
-                            ReconstructionController* reconController);
-    ~ScanController();
+                            ReconstructionController* reconController,
+                            SystemSafetyService* safetyService);
+      ~ScanController();
 
     enum ScanState {
         StateIdle,
         StatePreparing,
         StateScanning,
+        StatePaused,
         StateError
     };
     QString getSaveDirectory() const;
@@ -41,7 +47,8 @@ public slots:
     void updateSavePath(const QString &directory, const QString &prefix);
     void saveConfiguration(const QString &filePath);
     void loadConfiguration(const QString &filePath);
-
+    void requestPause();
+    void requestResume();
     void onRawFrameReady(FramePtr frame);
 
 private slots:
@@ -49,8 +56,10 @@ private slots:
     void onPreparing();
     void onScanning();
     void onError();
+    void onPaused();
 
     void onMoveFinished(bool success);
+    void onSafetyInterlockTriggered(const QString &reason);
 
 signals:
     void statusUpdated(const QString &status);
@@ -60,16 +69,21 @@ signals:
     void scanProgress(int current, int total);
     void reconstructionStarted();
     void configurationLoaded(const ScanParameters &params);
-
+    void pauseRequested();
+    void resumeRequested();
     void scanRequested();
     void stopRequested();
     void preparationFinished();
     void forceErrorState();
     void scanCompleted();
+    void scanProgress(const ScanProgress &progress);
 
 private:
     void setupStateMachine();
     void startNextScanStep();
+    bool validateParameters(QString &errorMessage);
+    void updateScanProgress();
+
     HardwareService* m_hardwareService;
     DataAcquisitionService* m_dataAcquisitionService;
     ConfigManager* m_configManager;
@@ -80,6 +94,7 @@ private:
     QState* m_preparingState;
     QState* m_scanningState;
     QState* m_errorState;
+    QState* m_pausedState;
 
     ScanParameters m_currentParams;
     QString m_saveDirectory;
@@ -87,5 +102,11 @@ private:
 
     int m_currentFrame;
     int m_totalFrames;
+
+    ScanProgress m_scanProgress;
+    QElapsedTimer m_scanTimer;
+
+    SystemSafetyService* m_safetyService;
+
 };
 #endif // SCANCONTROLLER_H

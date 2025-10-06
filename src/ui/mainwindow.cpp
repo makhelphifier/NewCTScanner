@@ -10,6 +10,8 @@
 #include "core/corefacade.h"
 #include "core/reconstructioncontroller.h"
 #include "core/hardwareservice.h"
+#include <QTime>
+#include "core/systemsafetyservice.h"
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -17,13 +19,23 @@ MainWindow::MainWindow(QWidget *parent)
 {
     m_scanController = CoreFacade::instance().scanController();
     m_hardwareService = CoreFacade::instance().hardwareService();
+    m_safetyService = CoreFacade::instance().safetyService();
 
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(centralWidget);
-    m_startXRayButton = new QPushButton("Start X-Ray", this);
+
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    m_startXRayButton = new QPushButton("Start Scan", this);
     m_stopButton = new QPushButton("Stop/Reset", this);
-    layout->addWidget(m_stopButton);
-    layout->addWidget(m_startXRayButton);
+    m_pauseButton = new QPushButton("Pause", this);
+    m_resumeButton = new QPushButton("Resume", this);
+    buttonLayout->addWidget(m_startXRayButton);
+    buttonLayout->addWidget(m_pauseButton);
+    buttonLayout->addWidget(m_resumeButton);
+    buttonLayout->addWidget(m_stopButton);
+    layout->addLayout(buttonLayout);
+
     m_statusLabel = new QLabel("Initializing...", this);
     m_statusLabel->setAlignment(Qt::AlignCenter);
     QFormLayout *formLayout = new QFormLayout();
@@ -39,9 +51,30 @@ MainWindow::MainWindow(QWidget *parent)
     m_frameCountSpinBox = new QSpinBox(this);
     m_frameCountSpinBox->setRange(1, 10000);
     m_frameCountSpinBox->setValue(360);
+
+    m_startAngleSpinBox = new QDoubleSpinBox(this);
+    m_startAngleSpinBox->setRange(0.0, 360.0);
+    m_startAngleSpinBox->setValue(0.0);
+    m_startAngleSpinBox->setSuffix(" °");
+
+    m_endAngleSpinBox = new QDoubleSpinBox(this);
+    m_endAngleSpinBox->setRange(0.0, 360.0);
+    m_endAngleSpinBox->setValue(360.0);
+    m_endAngleSpinBox->setSuffix(" °");
+
+    m_rotationSpeedSpinBox = new QDoubleSpinBox(this);
+    m_rotationSpeedSpinBox->setRange(0.1, 10.0);
+    m_rotationSpeedSpinBox->setValue(1.0);
+    m_rotationSpeedSpinBox->setSuffix(" °/s");
+
+
     formLayout->addRow("Voltage:", m_voltageSpinBox);
     formLayout->addRow("Current:", m_currentSpinBox);
     formLayout->addRow("Frame Count:", m_frameCountSpinBox);
+    formLayout->addRow("Start Angle:", m_startAngleSpinBox);
+    formLayout->addRow("End Angle:", m_endAngleSpinBox);
+    formLayout->addRow("Rotation Speed:", m_rotationSpeedSpinBox);
+
     QHBoxLayout* saveLayout = new QHBoxLayout();
     m_saveDirLineEdit = new QLineEdit("./scan_data", this);
     m_savePrefixLineEdit = new QLineEdit("scan", this);
@@ -58,6 +91,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_saveConfigButton = new QPushButton("Save Config", this);
     configLayout->addWidget(m_loadConfigButton);
     configLayout->addWidget(m_saveConfigButton);
+    m_doorButton = new QPushButton("Door Closed", this);
+    m_doorButton->setCheckable(true);
+    m_doorButton->setChecked(true);
+    configLayout->addWidget(m_doorButton);
     layout->addLayout(configLayout);
 
     layout->addLayout(formLayout);
@@ -100,12 +137,18 @@ MainWindow::MainWindow(QWidget *parent)
             m_scanController, &ScanController::requestScan);
     connect(m_stopButton, &QPushButton::clicked,
             m_scanController, &ScanController::requestStop);
-
+    connect(m_pauseButton, &QPushButton::clicked,
+            m_scanController, &ScanController::requestPause);
+    connect(m_resumeButton, &QPushButton::clicked,
+            m_scanController, &ScanController::requestResume);
     connect(m_scanController, &ScanController::stateChanged,
             this, &MainWindow::onStateChanged);
     connect(m_voltageSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
     connect(m_currentSpinBox, &QDoubleSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
     connect(m_frameCountSpinBox, &QSpinBox::valueChanged, this, &MainWindow::onParametersChanged);
+    connect(m_startAngleSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::onParametersChanged);
+    connect(m_endAngleSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::onParametersChanged);
+    connect(m_rotationSpeedSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::onParametersChanged);
     connect(this, &MainWindow::parametersChanged,
             m_scanController, &ScanController::updateParameters);
     connect(m_scanController, &ScanController::newProjectionImage,
@@ -118,9 +161,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(this, &MainWindow::savePathChanged, m_scanController, &ScanController::updateSavePath);
     connect(m_scanController, &ScanController::errorOccurred,
             this, &MainWindow::displayError, Qt::QueuedConnection);
-    connect(m_scanController, &ScanController::scanProgress, this, &MainWindow::updateScanProgress);
+    connect(m_scanController, SIGNAL(scanProgress(const ScanProgress&)),
+            this, SLOT(updateScanProgress(const ScanProgress&)));
+
     connect(m_loadConfigButton, &QPushButton::clicked, this, &MainWindow::onLoadConfig);
     connect(m_saveConfigButton, &QPushButton::clicked, this, &MainWindow::onSaveConfig);
+    connect(m_doorButton, &QPushButton::clicked, this, &MainWindow::onDoorButtonClicked);
+
     ReconstructionController* reconController = CoreFacade::instance().reconstructionController();
     connect(m_scanController, &ScanController::reconstructionStarted, this, &MainWindow::onReconstructionStarted);
     connect(reconController, &ReconstructionController::reconstructionProgress, this, &MainWindow::updateReconProgress);
@@ -159,6 +206,8 @@ void MainWindow::onStateChanged(ScanController::ScanState newState)
         m_startXRayButton->setEnabled(true);
         m_stopButton->setEnabled(false);
         setParametersEnabled(true);
+        m_pauseButton->setEnabled(false);
+        m_resumeButton->setEnabled(false);
         m_scanProgressBar->setValue(0);
         break;
 
@@ -166,19 +215,32 @@ void MainWindow::onStateChanged(ScanController::ScanState newState)
         m_startXRayButton->setEnabled(false);
         m_stopButton->setEnabled(true);
         setParametersEnabled(false);
+        m_pauseButton->setEnabled(false);
+        m_resumeButton->setEnabled(false);
         break;
 
     case ScanController::StateScanning:
         m_startXRayButton->setEnabled(false);
         m_stopButton->setEnabled(true);
         setParametersEnabled(false);
-        m_scanProgressBar->setValue(0);
+        // m_scanProgressBar->setValue(0);
+        m_pauseButton->setEnabled(true);
+        m_resumeButton->setEnabled(false);
+        break;
+    case ScanController::StatePaused:
+        m_startXRayButton->setEnabled(false);
+        m_stopButton->setEnabled(true);
+        m_pauseButton->setEnabled(false);
+        m_resumeButton->setEnabled(true);
+        setParametersEnabled(false);
         break;
 
     case ScanController::StateError:
         m_startXRayButton->setEnabled(false);
         m_stopButton->setEnabled(true);
         setParametersEnabled(false);
+        m_pauseButton->setEnabled(false);
+        m_resumeButton->setEnabled(false);
         break;
     }
 }
@@ -188,6 +250,9 @@ void MainWindow::onParametersChanged()
     params.voltage = m_voltageSpinBox->value();
     params.current = m_currentSpinBox->value();
     params.frameCount = m_frameCountSpinBox->value();
+    params.startAngle = m_startAngleSpinBox->value();
+    params.endAngle = m_endAngleSpinBox->value();
+    params.rotationSpeed = m_rotationSpeedSpinBox->value();
     emit parametersChanged(params);
 }
 
@@ -232,15 +297,9 @@ void MainWindow::setParametersEnabled(bool enabled)
     m_saveDirLineEdit->setEnabled(enabled);
     m_savePrefixLineEdit->setEnabled(enabled);
     m_browseButton->setEnabled(enabled);
-}
-
-
-void MainWindow::updateScanProgress(int current, int total)
-{
-    if (total > 0) {
-        m_scanProgressBar->setRange(0, total);
-        m_scanProgressBar->setValue(current);
-    }
+    m_startAngleSpinBox->setEnabled(enabled);
+    m_endAngleSpinBox->setEnabled(enabled);
+    m_rotationSpeedSpinBox->setEnabled(enabled);
 }
 
 
@@ -267,6 +326,9 @@ void MainWindow::applyLoadedParameters(const ScanParameters &params)
     m_voltageSpinBox->setValue(params.voltage);
     m_currentSpinBox->setValue(params.current);
     m_frameCountSpinBox->setValue(params.frameCount);
+    m_startAngleSpinBox->setValue(params.startAngle);
+    m_endAngleSpinBox->setValue(params.endAngle);
+    m_rotationSpeedSpinBox->setValue(params.rotationSpeed);
 
     onParametersChanged();
 }
@@ -310,4 +372,47 @@ void MainWindow::onSystemStatusUpdated(const SystemStatus &status)
     Log(QString("Motion Stage at %1 degrees.").arg(status.motionStageStatus.currentPosition));
 
     Log(QString("Detector frames acquired: %1").arg(status.detectorStatus.framesAcquired));
+}
+
+
+void ScanController::requestPause()
+{
+    Log("UI requested to pause scan.");
+    emit pauseRequested();
+}
+
+void ScanController::requestResume()
+{
+    Log("UI requested to resume scan.");
+    emit resumeRequested();
+}
+
+
+void MainWindow::updateScanProgress(const ScanProgress &progress)
+{
+    if (progress.totalProjections > 0) {
+        m_scanProgressBar->setRange(0, 100);
+        m_scanProgressBar->setValue(progress.percentComplete);
+
+        QTime remainingTime = QTime::fromMSecsSinceStartOfDay(static_cast<int>(progress.estimatedTimeRemaining_ms));
+        QString statusText = QString("Scanning: %1/%2 frames | Angle: %3° | Remaining: %4")
+                                 .arg(progress.currentProjection)
+                                 .arg(progress.totalProjections)
+                                 .arg(progress.currentAngle, 0, 'f', 1)
+                                 .arg(remainingTime.toString("mm:ss"));
+
+        m_statusLabel->setText(statusText);
+    }
+}
+
+
+void MainWindow::onDoorButtonClicked()
+{
+    bool is_checked = m_doorButton->isChecked();
+    if (is_checked) {
+        m_doorButton->setText("Door Closed");
+    } else {
+        m_doorButton->setText("DOOR OPEN");
+    }
+    m_safetyService->setDoorState(is_checked);
 }

@@ -26,6 +26,7 @@ public slots:
     void turnOffXRay();
     void moveTo(double position);
     void acquireFrame();
+    void setMotionSpeed(double speed_deg_per_sec);
 
     IXRaySource* xraySource() const;
     IDetector* detector() const;
